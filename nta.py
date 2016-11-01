@@ -41,7 +41,7 @@ logger.setLevel(logging.DEBUG)
 
 
 def save_document(id, content):
-    with open("documents/"+id, "wb") as text_file:
+    with open("documents_10/"+id, "wb") as text_file:
         text_file.write(content)
 
 
@@ -85,14 +85,17 @@ def cache_document_text_on_disk_much_faster(limit=100):
     reactor.suggestThreadPoolSize(concurrent)
     global added
     added = 0
-    with open("documents/_sources.csv", 'r') as csvfile:
+    with open("documents_10/_sources.csv", 'r') as csvfile:
         print('read document list')
         document_description = csv.reader(csvfile)
         for row in document_description:
             if added > limit:
                 break
             [serverCode, documentId, categoryId, textUrl] = row
-            safe_url = textUrl[:9]+"deploy"+textUrl[9:]
+            safe_url = textUrl
+            if "flashcards" not in textUrl:
+                safe_url = textUrl[:9]+"deploy"+textUrl[9:]
+
             added += 1
             addTask(safe_url, documentId)
 
@@ -102,4 +105,4 @@ def cache_document_text_on_disk_much_faster(limit=100):
         reactor.stop()
 
 if __name__ == "__main__":
-    cache_document_text_on_disk_much_faster(1000)
+    cache_document_text_on_disk_much_faster(3000)
