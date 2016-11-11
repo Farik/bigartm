@@ -1,13 +1,24 @@
 import glob
 import pandas as pd
+import marisa_trie
+import numpy as np
+from sklearn.externals import six
+
 
 import time
-from sklearn.feature_extraction.text import CountVectorizer
+
+import nltk
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 import logging
+
+from nltk.stem.snowball import SnowballStemmer
 
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 logger = logging.getLogger("BagOfWordsModel")
 logger.setLevel(logging.DEBUG)
+
+
+stemmer = SnowballStemmer("english")
 
 class BagOfWordsModel(object):
     OUT_FOLDER = 'out'
@@ -51,10 +62,11 @@ class BagOfWordsModel(object):
                 self.logger.info(
                     "Training CountVectorizer with max {0} features".format(
                         max_features))
-            vectorizer = CountVectorizer(max_features=max_features,
-                                         max_df=max_df,
-                                         stop_words='english').fit(
-                documents_corpus)
+
+            vectorizer = MarisaCountVectorizer( max_df=0.1, min_df=5,
+                                               max_features=max_features,
+                                          stop_words='english',
+                                         tokenizer=tokenize_and_stem, ngram_range=(1, 3)).fit(documents_corpus)
             self.logger.info("Trained vectorizer with {0} features".format(
                 len(vectorizer.get_feature_names())))
             self.logger.info("Building bag-of-words model")
@@ -101,7 +113,13 @@ class BagOfWordsModel(object):
             # Fill vocab_f file
             self.logger.info("Start filling {0}".format(vocab_name))
             for i in range(words_count):
-                vocab_f.write(self.get_feature_name(i) + '\n')
+                feature = self.get_feature_name(i)
+                spaces_count = feature.count(' ')
+                fclass = "@default_class"
+                if spaces_count > 0:
+                    feature = feature.replace(" ","_")
+                    fclass = "@ngram_"+str(spaces_count+1)
+                vocab_f.write(feature + ' ' + fclass + '\n')
             self.logger.info("Done.")
             # Fill docword_f file
             self.logger.info("Start filling {0}".format(docword_name))
@@ -117,6 +135,35 @@ class BagOfWordsModel(object):
                     self.bow_sparse_matrix[x, y]) + '\n')
             self.logger.info("Done.")
 
+
+
+
+
+class MarisaCountVectorizer(CountVectorizer):
+
+    # ``CountVectorizer.fit`` method calls ``fit_transform`` so
+    # ``fit`` is not provided
+    def fit_transform(self, raw_documents, y=None):
+        X = super(MarisaCountVectorizer, self).fit_transform(raw_documents)
+        X = self._freeze_vocabulary(X)
+        return X
+
+    def _freeze_vocabulary(self, X=None):
+        if not self.fixed_vocabulary_:
+            frozen = marisa_trie.Trie(six.iterkeys(self.vocabulary_))
+            if X is not None:
+                X = self._reorder_features(X, self.vocabulary_, frozen)
+            self.vocabulary_ = frozen
+            self.fixed_vocabulary_ = True
+            del self.stop_words_
+        return X
+
+    def _reorder_features(self, X, old_vocabulary, new_vocabulary):
+        map_index = np.empty(len(old_vocabulary), dtype=np.int32)
+        for term, new_val in six.iteritems(new_vocabulary):
+            map_index[new_val] = old_vocabulary[term]
+        return X[:, map_index]
+
 def file_contents(documents):
     for fn in documents:
         yield fn, open(fn, 'r').read()
@@ -130,11 +177,33 @@ def build_texts(input):
 
     return documents
 
+def tokenize_only(text):
+    # first tokenize by sentence, then by word to ensure that punctuation is caught as it's own token
+    tokens = [word.lower() for sent in nltk.sent_tokenize(text) for word in nltk.word_tokenize(sent)]
+    filtered_tokens = []
+    # filter out any tokens not containing letters (e.g., numeric tokens, raw punctuation)
+    for token in tokens:
+        if nltk.re.search('[a-zA-Z]', token):
+            filtered_tokens.append(token)
+    return filtered_tokens
+
+def tokenize_and_stem(text):
+    # first tokenize by sentence, then by word to ensure that punctuation is caught as it's own token
+    tokens = [word for sent in nltk.sent_tokenize(text) for word in nltk.word_tokenize(sent)]
+    filtered_tokens = []
+    # filter out any tokens not containing letters (e.g., numeric tokens, raw punctuation)
+    for token in tokens:
+        if nltk.re.search('[a-zA-Z0-9]', token):
+            if len(token) > 1:
+                filtered_tokens.append(token)
+    stems = [stemmer.stem(t) for t in filtered_tokens]
+    return stems
+
 
 if __name__ == "__main__":
 
-    limit = 3
+    limit = 300
 
-    bowm = BagOfWordsModel(build_texts(glob.glob("documents_10/*")[0:limit]))
+    bowm = BagOfWordsModel(build_texts(glob.glob("documents_10/*")[0:limit]),max_features=500000)
     bowm.to_uci(save_folder='corpus')
     print bowm
