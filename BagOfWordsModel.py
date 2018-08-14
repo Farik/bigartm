@@ -202,8 +202,8 @@ def tokenize_and_stem(text):
 
 if __name__ == "__main__":
 
-    limit = 300
+    limit = 3000
 
-    bowm = BagOfWordsModel(build_texts(glob.glob("documents_10/*")[0:limit]),max_features=500000)
+    bowm = BagOfWordsModel(build_texts(glob.glob("documents_10/*")[0:limit]), max_features=500000)
     bowm.to_uci(save_folder='corpus')
     print bowm

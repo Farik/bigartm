@@ -41,7 +41,7 @@ logger.setLevel(logging.DEBUG)
 
 
 def save_document(id, content):
-    with open("documents_10/"+id, "wb") as text_file:
+    with open("documents_manualzz/"+id, "wb") as text_file:
         text_file.write(content)
 
 

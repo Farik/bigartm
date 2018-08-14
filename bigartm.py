@@ -1,16 +1,16 @@
 import artm
 
-# batch_vectorizer = artm.BatchVectorizer(
-#                                            data_format='bow_uci',
-#                                            data_path="corpus",
-#                                            collection_name='bow',
-#                                            target_folder='artm_batches')
+batch_vectorizer = artm.BatchVectorizer(
+                                           data_format='bow_uci',
+                                           data_path="corpus",
+                                           collection_name='bow',
+                                           target_folder='artm_batches')
 
-batch_vectorizer = artm.BatchVectorizer(data_path='artm_batches',
-                                         data_format='batches')
+# batch_vectorizer = artm.BatchVectorizer(data_path='artm_batches',
+#                                          data_format='batches')
 # 129 total
 T = 10
-class_priority = {"@default_class": 1, "@ngram_2": 5}
+class_priority = {"@default_class": 1, "@ngram_2": 2, "@ngram_3": 6}
 model = artm.ARTM(num_topics=T, topic_names=["sbj"+str(i) for i in range(T)], class_ids=class_priority)
 
 model.scores.add(artm.PerplexityScore(name='my_fisrt_perplexity_score',
@@ -18,7 +18,7 @@ model.scores.add(artm.PerplexityScore(name='my_fisrt_perplexity_score',
                                       dictionary=batch_vectorizer.dictionary))
 model.scores.add(artm.SparsityPhiScore(name='SparsityPhiScore', class_id="@default_class"))
 model.scores.add(artm.SparsityThetaScore(name='SparsityThetaScore'))
-model.scores.add(artm.TopTokensScore(name="top_words", num_tokens=15, class_id="@ngram_2"))
+model.scores.add(artm.TopTokensScore(name="top_words", num_tokens=15, class_id="@ngram_3"))
 
 model.initialize(batch_vectorizer.dictionary)
 
@@ -53,4 +53,4 @@ for topic_name in model.topic_names:
         print word,
     print
 
-model.save("models/3kd_10t_2n_SparsePhi.model")
+model.save("models/3kd_10t_500limit_3n_SparsePhi.model")
